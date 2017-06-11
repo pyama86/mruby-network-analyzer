@@ -1,0 +1,6 @@
+name: mruby-network-analyzer
+description: NetworkAnalyzer class
+author: pyama86
+website: https://github.com/pyama86/mruby-network-analyzer
+protocol: git
+repository: https://github.com/pyama86/mruby-network-analyzer.git
