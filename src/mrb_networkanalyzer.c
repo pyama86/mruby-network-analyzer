@@ -430,6 +430,25 @@ static mrb_value mrb_networkanalyzer_current(mrb_state *mrb, mrb_value self)
   pthread_mutex_unlock(&data->mutex);
   return current;
 }
+
+static mrb_value mrb_networkanalyzer_new(mrb_state *mrb, mrb_value self)
+{
+  mrb_networkanalyzer_data *data;
+  char *if_name;
+  int if_name_len;
+
+  mrb_get_args(mrb, "s", &if_name, &if_name_len);
+
+  data = (mrb_networkanalyzer_data *)mrb_malloc(mrb, sizeof(mrb_networkanalyzer_data));
+  DATA_PTR(self) = data;
+  DATA_TYPE(self) = &mrb_networkanalyzer_data_type;
+
+  init_history(data);
+  packet_init(mrb, &self, if_name);
+  pthread_mutex_init(&data->mutex, NULL);
+
+  return self;
+}
 static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
 {
   mrb_networkanalyzer_data *data;
@@ -440,15 +459,7 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
   char ebuf[PCAP_ERRBUF_SIZE];
 
   mrb_get_args(mrb, "s", &if_name, &if_name_len);
-
-  data = (mrb_networkanalyzer_data *)mrb_malloc(mrb, sizeof(mrb_networkanalyzer_data));
-  DATA_PTR(self) = data;
-  DATA_TYPE(self) = &mrb_networkanalyzer_data_type;
-
-  init_history(data);
-  packet_init(mrb, &self, if_name);
-
-  pthread_mutex_init(&data->mutex, NULL);
+  data = (mrb_networkanalyzer_data *)DATA_PTR(self);
 
   if ((pd = pcap_open_live(if_name, CAPTURE_LENGTH, 1, 1000, ebuf)) == NULL) {
     mrb_raise(mrb, E_RUNTIME_ERROR, "pcap open error");
@@ -475,6 +486,7 @@ void mrb_mruby_network_analyzer_gem_init(mrb_state *mrb)
 {
   struct RClass *networkanalyzer;
   networkanalyzer = mrb_define_class(mrb, "NetworkAnalyzer", mrb->object_class);
+  mrb_define_method(mrb, networkanalyzer, "_new", mrb_networkanalyzer_new, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, networkanalyzer, "_collect", mrb_networkanalyzer_collect, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, networkanalyzer, "current", mrb_networkanalyzer_current, MRB_ARGS_NONE());
   MRB_SET_INSTANCE_TT(networkanalyzer, MRB_TT_DATA);
