@@ -26,5 +26,5 @@ end
 ```
 
 ## License
-under the MIT License:
+under the GPL License:
 - see LICENSE file

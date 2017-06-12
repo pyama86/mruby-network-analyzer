@@ -1,3 +1,4 @@
+// base: https://github.com/lsanotes/iftop
 #define	ETHER_ADDR_LEN		6
 struct	ether_header {
 	u_int8_t	ether_dhost[ETHER_ADDR_LEN];
