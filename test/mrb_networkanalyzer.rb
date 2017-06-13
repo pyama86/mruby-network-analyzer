@@ -2,16 +2,8 @@
 ## NetworkAnalyzer Test
 ##
 
-assert("NetworkAnalyzer#hello") do
-  t = NetworkAnalyzer.new "hello"
-  assert_equal("hello", t.hello)
-end
-
-assert("NetworkAnalyzer#bye") do
-  t = NetworkAnalyzer.new "hello"
-  assert_equal("hello bye", t.bye)
-end
-
-assert("NetworkAnalyzer.hi") do
-  assert_equal("hi!!", NetworkAnalyzer.hi)
+assert("NetworkAnalyzer#new") do
+  n = NetworkAnalyzer.new("lo")
+  system('ping 127.0.0.1 -c 3')
+  assert_equal('127.0.0.1', n.current.first['src_host'])
 end
