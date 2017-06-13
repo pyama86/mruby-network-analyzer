@@ -5,6 +5,7 @@ code base is [iftop](http://www.ex-parrot.com/pdw/iftop/)
 
 ## install by mrbgems
 - add conf.gem line to `build_config.rb`
+- install `libpcap-dev`
 
 ```ruby
 MRuby::Build.new do |conf|
