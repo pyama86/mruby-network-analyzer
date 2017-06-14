@@ -105,10 +105,7 @@ int get_addrs_ioctl(mrb_state *mrb, mrb_value *self, char *interface)
   }
 
   (*(struct sockaddr_in *)&ifr.ifr_addr).sin_family = AF_INET;
-  if (ioctl(s, SIOCGIFADDR, &ifr) < 0) {
-    mrb_raisef(mrb, E_RUNTIME_ERROR, "Unable to get IP address for interface: %S\n",
-               mrb_str_new_cstr(mrb, interface));
-  } else {
+  if (ioctl(s, SIOCGIFADDR, &ifr) >= 0) {
     memcpy(&data->if_ip_addr, &((*(struct sockaddr_in *)&ifr.ifr_addr).sin_addr),
            sizeof(struct in_addr));
     got_ip_addr = 2;
