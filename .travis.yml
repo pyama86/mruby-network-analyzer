@@ -7,4 +7,4 @@ before_install:
 install:
     - sudo apt-get -qq install rake bison git gperf libpcap-dev
 script:
-  - rake test
+  - sudo rake test
