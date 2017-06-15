@@ -2,8 +2,9 @@ class NetworkAnalyzer
   def initialize(name)
     ::SignalThread.mask(:INT)
     self._new(name)
+
     pr = Proc.new do
-      self._collect(name)
+      self._collect
     end
 
     ::Thread.new(pr) do |local|
