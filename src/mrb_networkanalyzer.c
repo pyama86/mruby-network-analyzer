@@ -71,12 +71,6 @@ static const struct mrb_data_type mrb_networkanalyzer_data_type = {
     "mrb_networkanalyzer_data", mrb_free,
 };
 
-sig_atomic_t foad;
-
-static void finish(int sig) {
-    foad = sig;
-}
-
 int get_addrs_ioctl(mrb_state *mrb, mrb_value *self, char *interface)
 {
   int s;
@@ -440,9 +434,6 @@ static mrb_value mrb_networkanalyzer_new(mrb_state *mrb, mrb_value self)
   mrb_networkanalyzer_data *data;
   char *if_name;
   int if_name_len;
-  struct sigaction sa = {};
-  sa.sa_handler = finish;
-  sigaction(SIGINT, &sa, NULL);
 
   mrb_get_args(mrb, "s", &if_name, &if_name_len);
 
@@ -462,6 +453,7 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
   char *if_name;
   int if_name_len;
   int dlt;
+  sigset_t mask;
   pcap_t *pd;
   char ebuf[PCAP_ERRBUF_SIZE];
 
@@ -476,8 +468,15 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
     mrb_raise(mrb, E_RUNTIME_ERROR, "pcap open error");
   }
 
+
   dlt = pcap_datalink(pd);
   if (dlt == DLT_EN10MB) {
+
+    // all signal mask
+    sigfillset(&mask);
+    if (pthread_sigmask(SIG_BLOCK, &mask, NULL) != 0)
+      mrb_raise(mrb, E_RUNTIME_ERROR, "set mask error");
+
     packet_loop_conf c = {mrb, &self};
 
     if (pcap_loop(pd, -1, handle_eth_packet, &c) < 0) {
