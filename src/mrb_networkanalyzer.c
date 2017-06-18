@@ -68,7 +68,7 @@ typedef struct {
 
 typedef struct {
   mrb_state *mrb;
-  mrb_value *self;
+  mrb_networkanalyzer_data *data;
 } packet_loop_conf;
 
 static void mrb_mruby_network_analyzer_data_free(mrb_state *mrb, void *p)
@@ -83,16 +83,13 @@ static const struct mrb_data_type mrb_networkanalyzer_data_type = {
     "mrb_networkanalyzer_data", mrb_mruby_network_analyzer_data_free,
 };
 
-int get_addrs_ioctl(mrb_state *mrb, mrb_value *self, char *interface)
+int get_addrs_ioctl(mrb_state *mrb, mrb_networkanalyzer_data *data, char *interface)
 {
   int s;
   struct ifreq ifr = {};
   int got_hw_addr = 0;
   int got_ip_addr = 0;
   int got_ip6_addr = 0;
-  mrb_networkanalyzer_data *data;
-
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*self);
 
   s = socket(AF_INET, SOCK_DGRAM, 0);
   if (s == -1) {
@@ -203,7 +200,7 @@ history_type *history_create(mrb_state *mrb)
   return h;
 }
 
-static void handle_ip_packet(mrb_state *mrb, mrb_value *self, struct ip *iptr, int hw_dir)
+static void handle_ip_packet(mrb_state *mrb, mrb_networkanalyzer_data *data, struct ip *iptr, int hw_dir)
 {
   int direction = 0;
   addr_pair ap;
@@ -216,9 +213,6 @@ static void handle_ip_packet(mrb_state *mrb, mrb_value *self, struct ip *iptr, i
     void **void_pp;
   } u_ht = {&ht};
   struct ip6_hdr *ip6tr = (struct ip6_hdr *)iptr;
-
-  mrb_networkanalyzer_data *data;
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*self);
 
   memset(&ap, '\0', sizeof(ap));
 
@@ -348,7 +342,7 @@ static void handle_eth_packet(unsigned char *args, const struct pcap_pkthdr *pkt
   packet_loop_conf *c;
   c = (packet_loop_conf *)args;
 
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*c->self);
+  data = c->data;
   data->counter++;
 
   eptr = (struct ether_header *)packet;
@@ -376,23 +370,20 @@ static void handle_eth_packet(unsigned char *args, const struct pcap_pkthdr *pkt
     }
 
     iptr = (struct ip *)(payload);
-    handle_ip_packet(c->mrb, c->self, iptr, dir);
+    handle_ip_packet(c->mrb, c->data, iptr, dir);
   }
   data->counter--;
 }
 
-void packet_init(mrb_state *mrb, mrb_value *self, char *if_name)
+void packet_init(mrb_state *mrb, mrb_networkanalyzer_data *data, char *if_name)
 {
   char errbuf[PCAP_ERRBUF_SIZE];
   int result;
-  mrb_networkanalyzer_data *data;
-
-  result = get_addrs_ioctl(mrb, self, if_name);
+  result = get_addrs_ioctl(mrb, data, if_name);
   if (result < 0) {
     mrb_raise(mrb, E_RUNTIME_ERROR, "get_addrs_ioctl error");
   }
 
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*self);
   data->have_hw_addr = result & 0x01;
   data->have_ip_addr = result & 0x02;
   data->have_ip6_addr = result & 0x04;
@@ -478,7 +469,7 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
 
   dlt = pcap_datalink(data->pd);
   if (dlt == DLT_EN10MB) {
-    packet_loop_conf c = {mrb, &self};
+    packet_loop_conf c = {mrb, data};
     pcap_loop(data->pd, -1, handle_eth_packet, &c);
     pcap_close(data->pd);
     while(data->counter != 0 && retry < WAIT_TIME) {
