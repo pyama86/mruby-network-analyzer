@@ -132,9 +132,9 @@ int ip6_addr_match(struct in6_addr *if_ip6_addr, struct in6_addr *addr)
   return IN6_ARE_ADDR_EQUAL(addr, &if_ip6_addr);
 }
 
-void init_history(mrb_networkanalyzer_data *data)
+void init_history(mrb_state *mrb, mrb_networkanalyzer_data *data)
 {
-  data->history = addr_hash_create();
+  data->history = addr_hash_create(mrb);
   data->counter = 0;
   data->history_pos = 0;
   data->history_len = 1;
@@ -196,10 +196,10 @@ void assign_addr_pair(addr_pair *ap, struct ip *iptr, int flip)
     }
   }
 }
-history_type *history_create()
+history_type *history_create(mrb_state *mrb)
 {
   history_type *h;
-  h = xcalloc(1, sizeof *h);
+  h = xcalloc(mrb, 1, sizeof *h);
   return h;
 }
 
@@ -261,8 +261,8 @@ static void handle_ip_packet(mrb_state *mrb, mrb_value *self, struct ip *iptr, i
 
   pthread_mutex_lock(&data->mutex);
   if (hash_find(data->history, &ap, u_ht.void_pp) == HASH_STATUS_KEY_NOT_FOUND) {
-    ht = history_create();
-    hash_insert(data->history, &ap, ht);
+    ht = history_create(mrb);
+    hash_insert(mrb, data->history, &ap, ht);
   }
 
   switch (IP_V(iptr)) {
@@ -457,7 +457,7 @@ static mrb_value mrb_networkanalyzer_new(mrb_state *mrb, mrb_value self)
   data = (mrb_networkanalyzer_data *)mrb_malloc(mrb, sizeof(mrb_networkanalyzer_data));
   DATA_PTR(self) = data;
   DATA_TYPE(self) = &mrb_networkanalyzer_data_type;
-  init_history(data);
+  init_history(mrb, data);
   packet_init(mrb, &self, if_name);
   pthread_mutex_init(&data->mutex, NULL);
 

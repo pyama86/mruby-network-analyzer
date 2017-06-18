@@ -22,43 +22,18 @@ static const char rcsid[] = "$Id: util.c,v 1.1 2002/03/24 17:27:12 chris Exp $";
 
 /* xmalloc:
  * Malloc, and abort if malloc fails. */
-void *xmalloc(size_t n) {
+void *xmalloc(mrb_state *mrb, size_t n) {
     void *v;
-    v = malloc(n);
+    v = mrb_malloc(mrb, n);
     if (!v) abort();
     return v;
 }
 
 /* xcalloc:
  * As above. */
-void *xcalloc(size_t n, size_t m) {
+void *xcalloc(mrb_state *mrb, size_t n, size_t m) {
     void *v;
-    v = calloc(n, m);
+    v = mrb_calloc(mrb, n, m);
     if (!v) abort();
     return v;
 }
-
-/* xrealloc:
- * As above. */
-void *xrealloc(void *w, size_t n) {
-    void *v;
-    v = realloc(w, n);
-    if (n != 0 && !v) abort();
-    return v;
-}
-
-/* xstrdup:
- * As above. */
-char *xstrdup(const char *s) {
-    char *t;
-    t = strdup(s);
-    if (!t) abort();
-    return t;
-}
-
-/* xfree:
- * Free, ignoring a passed NULL value. */
-void xfree(void *v) {
-    if (v) free(v);
-}
-
