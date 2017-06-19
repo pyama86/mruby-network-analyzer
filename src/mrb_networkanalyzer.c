@@ -388,7 +388,7 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
   mrb_value sec, max;
   max = mrb_fixnum_value(-1);
 
-  mrb_get_args(mrb, "si|i", &if_name, &if_name_len, &sec, &max);
+  mrb_get_args(mrb, "zi|i", &if_name, &sec, &max);
 
   data = (mrb_networkanalyzer_data *)mrb_malloc(mrb, sizeof(mrb_networkanalyzer_data));
   init_history(mrb, data);
