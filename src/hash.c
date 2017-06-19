@@ -26,39 +26,6 @@ hash_status_enum hash_insert(mrb_state *mrb, hash_type* hash_table, void* key, v
     return HASH_STATUS_OK;
 }
 
-hash_status_enum hash_delete(mrb_state *mrb, hash_type* hash_table, void* key) {
-    hash_node_type *p0, *p;
-    int bucket;
-
-   /********************************************
-    *  delete node containing data from table  *
-    ********************************************/
-
-    /* find node */
-    p0 = 0;
-    bucket = hash_table->hash(key);
-    p = hash_table->table[bucket];
-    while (p && !hash_table->compare(p->key, key)) {
-        p0 = p;
-        p = p->next;
-    }
-    if (!p) return HASH_STATUS_KEY_NOT_FOUND;
-
-    /* p designates node to delete, remove it from list */
-    if (p0) {
-        /* not first node, p0 points to previous node */
-        p0->next = p->next;
-    }
-    else {
-        /* first node on chain */
-        hash_table->table[bucket] = p->next;
-    }
-
-    hash_table->delete_key(mrb, p->key);
-    free (p);
-    return HASH_STATUS_OK;
-}
-
 hash_status_enum hash_find(hash_type* hash_table, void* key, void **rec) {
     hash_node_type *p;
 
@@ -99,34 +66,11 @@ hash_status_enum hash_next_item(hash_type* hash_table, hash_node_type** ppnode) 
     return HASH_STATUS_OK;
 }
 
-void hash_delete_all(mrb_state *mrb, hash_type* hash_table) {
-    int i;
-    hash_node_type *n, *nn;
-    for(i = 0; i < hash_table->size; i++) {
-        n = hash_table->table[i];
-        while(n != NULL) {
-            nn = n->next;
-            hash_table->delete_key(mrb, n->key);
-			// XXX: it's not need to delete the user's data(rec) ?
-			//hash_table->delete_key(n->rec);
-            mrb_free(mrb, n);
-            n = nn;
-        }
-        hash_table->table[i] = NULL;
-    }
-}
-
-
 /*
  * Allocate and return a hash
  */
 hash_status_enum hash_initialise(mrb_state *mrb, hash_type* hash_table) {
     hash_table->table = xcalloc(mrb, hash_table->size, sizeof *hash_table->table);
-    return HASH_STATUS_OK;
-}
-
-hash_status_enum hash_destroy(mrb_state *mrb, hash_type* hash_table) {
-    mrb_free(mrb, hash_table->table);
     return HASH_STATUS_OK;
 }
 
