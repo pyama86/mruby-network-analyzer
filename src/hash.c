@@ -26,7 +26,7 @@ hash_status_enum hash_insert(mrb_state *mrb, hash_type* hash_table, void* key, v
     return HASH_STATUS_OK;
 }
 
-hash_status_enum hash_delete(hash_type* hash_table, void* key) {
+hash_status_enum hash_delete(mrb_state *mrb, hash_type* hash_table, void* key) {
     hash_node_type *p0, *p;
     int bucket;
 
@@ -54,7 +54,7 @@ hash_status_enum hash_delete(hash_type* hash_table, void* key) {
         hash_table->table[bucket] = p->next;
     }
 
-    hash_table->delete_key(p->key);
+    hash_table->delete_key(mrb, p->key);
     free (p);
     return HASH_STATUS_OK;
 }
@@ -99,17 +99,17 @@ hash_status_enum hash_next_item(hash_type* hash_table, hash_node_type** ppnode) 
     return HASH_STATUS_OK;
 }
 
-void hash_delete_all(hash_type* hash_table) {
+void hash_delete_all(mrb_state *mrb, hash_type* hash_table) {
     int i;
     hash_node_type *n, *nn;
     for(i = 0; i < hash_table->size; i++) {
         n = hash_table->table[i];
         while(n != NULL) {
             nn = n->next;
-            hash_table->delete_key(n->key);
+            hash_table->delete_key(mrb, n->key);
 			// XXX: it's not need to delete the user's data(rec) ?
 			//hash_table->delete_key(n->rec);
-            free(n);
+            mrb_free(mrb, n);
             n = nn;
         }
         hash_table->table[i] = NULL;
@@ -125,8 +125,8 @@ hash_status_enum hash_initialise(mrb_state *mrb, hash_type* hash_table) {
     return HASH_STATUS_OK;
 }
 
-hash_status_enum hash_destroy(hash_type* hash_table) {
-    free(hash_table->table);
+hash_status_enum hash_destroy(mrb_state *mrb, hash_type* hash_table) {
+    mrb_free(mrb, hash_table->table);
     return HASH_STATUS_OK;
 }
 
