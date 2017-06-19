@@ -26,18 +26,18 @@ typedef struct {
     int (*compare) (void*, void*);
     int (*hash) (void*);
     void* (*copy_key) (void*, void*);
-    void (*delete_key) (void*);
+    void (*delete_key) (mrb_state*, void*);
     hash_node_type** table;
     int size;
 } hash_type;
 
 
 hash_status_enum hash_initialise(mrb_state *mrb, hash_type*);
-hash_status_enum hash_destroy(hash_type*);
+hash_status_enum hash_destroy(mrb_state *mrb, hash_type*);
 hash_status_enum hash_insert(mrb_state *mrb, hash_type*, void* key, void *rec);
-hash_status_enum hash_delete(hash_type* hash_table, void* key);
+hash_status_enum hash_delete(mrb_state *mrb, hash_type* hash_table, void* key);
 hash_status_enum hash_find(hash_type* hash_table, void* key, void** rec);
 hash_status_enum hash_next_item(hash_type* hash_table, hash_node_type** ppnode);
-void hash_delete_all(hash_type* hash_table);
+void hash_delete_all(mrb_state *mrb, hash_type* hash_table);
 
 #endif /* __HASH_H_ */

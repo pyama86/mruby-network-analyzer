@@ -75,7 +75,7 @@ static void mrb_mruby_network_analyzer_data_free(mrb_state *mrb, void *p)
 {
   mrb_networkanalyzer_data *data = p;
   pthread_mutex_destroy(&data->mutex);
-  free(data->history);
+  mrb_free(mrb, data->history);
   mrb_free(mrb, data);
 }
 
@@ -253,7 +253,6 @@ static void handle_ip_packet(mrb_state *mrb, mrb_networkanalyzer_data *data, str
     }
   }
 
-  pthread_mutex_lock(&data->mutex);
   if (hash_find(data->history, &ap, u_ht.void_pp) == HASH_STATUS_KEY_NOT_FOUND) {
     ht = history_create(mrb);
     hash_insert(mrb, data->history, &ap, ht);
@@ -287,10 +286,9 @@ static void handle_ip_packet(mrb_state *mrb, mrb_networkanalyzer_data *data, str
     data->history_totals.total_sent += len;
   }
 
-  pthread_mutex_unlock(&data->mutex);
 }
 
-void history_rotate(mrb_networkanalyzer_data *data)
+void history_rotate(mrb_state *mrb, mrb_networkanalyzer_data *data)
 {
   hash_node_type *n = NULL;
   data->history_pos = (data->history_pos + 1) % HISTORY_LENGTH;
@@ -302,8 +300,8 @@ void history_rotate(mrb_networkanalyzer_data *data)
 
     if (d->last_write == data->history_pos) {
       addr_pair key = *(addr_pair *)(n->key);
-      hash_delete(data->history, &key);
-      free(d);
+      hash_delete(mrb, data->history, &key);
+      mrb_free(mrb, d);
     } else {
       d->recv[data->history_pos] = 0;
       d->sent[data->history_pos] = 0;
@@ -319,7 +317,7 @@ void history_rotate(mrb_networkanalyzer_data *data)
   }
 }
 
-void tick(mrb_networkanalyzer_data *data)
+void tick(mrb_state *mrb, mrb_networkanalyzer_data *data)
 {
   time_t t;
 
@@ -327,7 +325,7 @@ void tick(mrb_networkanalyzer_data *data)
 
   t = time(NULL);
   if (t - data->last_timestamp >= RESOLUTION) {
-    history_rotate(data);
+    history_rotate(mrb, data);
     data->last_timestamp = t;
   }
   pthread_mutex_unlock(&data->mutex);
@@ -349,7 +347,7 @@ static void handle_eth_packet(unsigned char *args, const struct pcap_pkthdr *pkt
   ether_type = ntohs(eptr->ether_type);
   payload = packet + sizeof(struct ether_header);
 
-  tick(data);
+  tick(c->mrb, data);
 
   if (ether_type == ETHERTYPE_8021Q) {
     struct vlan_8021q_header *vptr;
@@ -402,7 +400,6 @@ static mrb_value mrb_networkanalyzer_current(mrb_state *mrb, mrb_value self)
   hash_node_type *n = NULL;
 
   data = (mrb_networkanalyzer_data *)DATA_PTR(self);
-  pthread_mutex_lock(&data->mutex);
 
   current = mrb_ary_new(mrb);
   while (hash_next_item(data->history, &n) == HASH_STATUS_OK) {
@@ -432,7 +429,6 @@ static mrb_value mrb_networkanalyzer_current(mrb_state *mrb, mrb_value self)
     mrb_hash_set(mrb, h, mrb_str_new_cstr(mrb, "recv_history"), ary_recv_history);
     mrb_ary_push(mrb, current, h);
   }
-  pthread_mutex_unlock(&data->mutex);
   return current;
 }
 
@@ -482,17 +478,17 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
   return self;
 }
 
-struct RClass *networkanalyzer;
 static mrb_value mrb_networkanalyzer_stop(mrb_state *mrb, mrb_value self)
 {
   mrb_networkanalyzer_data *data;
   data = (mrb_networkanalyzer_data *)DATA_PTR(self);
 
-  if (mrb_obj_is_kind_of(mrb, self, networkanalyzer) && data->pd != NULL) pcap_breakloop(data->pd);
+  if (mrb_obj_is_kind_of(mrb, self, mrb_class_get(mrb, "NetworkAnalyzer")) && data->pd != NULL) pcap_breakloop(data->pd);
 }
 
 void mrb_mruby_network_analyzer_gem_init(mrb_state *mrb)
 {
+  struct RClass *networkanalyzer;
   networkanalyzer = mrb_define_class(mrb, "NetworkAnalyzer", mrb->object_class);
   mrb_define_method(mrb, networkanalyzer, "_new", mrb_networkanalyzer_new, MRB_ARGS_REQ(1));
   mrb_define_method(mrb, networkanalyzer, "_collect", mrb_networkanalyzer_collect, MRB_ARGS_NONE());

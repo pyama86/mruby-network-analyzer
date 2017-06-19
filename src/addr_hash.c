@@ -6,6 +6,7 @@
 #include "addr_hash.h"
 #include "hash.h"
 #include "iftop.h"
+#include "mruby.h"
 
 #define hash_table_size 256
 
@@ -79,8 +80,8 @@ void* copy_key(mrb_state *mrb, void* orig) {
     return copy;
 }
 
-void delete_key(void* key) {
-    free(key);
+void delete_key(mrb_state *mrb, void* key) {
+    mrb_free(mrb, key);
 }
 
 /*
