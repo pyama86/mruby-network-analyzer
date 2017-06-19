@@ -18,6 +18,7 @@
 #include <pcap.h>
 #include <pthread.h>
 #include <time.h>
+#include <unistd.h>
 
 #include <net/if.h>
 #include <netinet/in.h>
@@ -40,6 +41,7 @@
 #define CAPTURE_LENGTH 256
 #define HISTORY_LENGTH 20
 #define HOSTNAME_LENGTH 256
+#define WAIT_TIME 10
 #define PushHistory(type)                                                                          \
   do {                                                                                             \
     if (d->type[i] != 0) {                                                                     \
@@ -58,35 +60,36 @@ typedef struct {
   history_type history_totals;
   int history_pos;
   int history_len;
+  int counter;
   time_t last_timestamp;
   pthread_mutex_t mutex;
+  pcap_t *pd;
 } mrb_networkanalyzer_data;
 
 typedef struct {
   mrb_state *mrb;
-  mrb_value *self;
+  mrb_networkanalyzer_data *data;
 } packet_loop_conf;
 
-static const struct mrb_data_type mrb_networkanalyzer_data_type = {
-    "mrb_networkanalyzer_data", mrb_free,
-};
-
-sig_atomic_t foad;
-
-static void finish(int sig) {
-    foad = sig;
+static void mrb_mruby_network_analyzer_data_free(mrb_state *mrb, void *p)
+{
+  mrb_networkanalyzer_data *data = p;
+  pthread_mutex_destroy(&data->mutex);
+  free(data->history);
+  mrb_free(mrb, data);
 }
 
-int get_addrs_ioctl(mrb_state *mrb, mrb_value *self, char *interface)
+static const struct mrb_data_type mrb_networkanalyzer_data_type = {
+    "mrb_networkanalyzer_data", mrb_mruby_network_analyzer_data_free,
+};
+
+int get_addrs_ioctl(mrb_state *mrb, mrb_networkanalyzer_data *data, char *interface)
 {
   int s;
   struct ifreq ifr = {};
   int got_hw_addr = 0;
   int got_ip_addr = 0;
   int got_ip6_addr = 0;
-  mrb_networkanalyzer_data *data;
-
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*self);
 
   s = socket(AF_INET, SOCK_DGRAM, 0);
   if (s == -1) {
@@ -126,9 +129,10 @@ int ip6_addr_match(struct in6_addr *if_ip6_addr, struct in6_addr *addr)
   return IN6_ARE_ADDR_EQUAL(addr, &if_ip6_addr);
 }
 
-void init_history(mrb_networkanalyzer_data *data)
+void init_history(mrb_state *mrb, mrb_networkanalyzer_data *data)
 {
-  data->history = addr_hash_create();
+  data->history = addr_hash_create(mrb);
+  data->counter = 0;
   data->history_pos = 0;
   data->history_len = 1;
   data->last_timestamp = time(NULL);
@@ -189,14 +193,14 @@ void assign_addr_pair(addr_pair *ap, struct ip *iptr, int flip)
     }
   }
 }
-history_type *history_create()
+history_type *history_create(mrb_state *mrb)
 {
   history_type *h;
-  h = xcalloc(1, sizeof *h);
+  h = xcalloc(mrb, 1, sizeof *h);
   return h;
 }
 
-static void handle_ip_packet(mrb_state *mrb, mrb_value *self, struct ip *iptr, int hw_dir)
+static void handle_ip_packet(mrb_state *mrb, mrb_networkanalyzer_data *data, struct ip *iptr, int hw_dir)
 {
   int direction = 0;
   addr_pair ap;
@@ -209,9 +213,6 @@ static void handle_ip_packet(mrb_state *mrb, mrb_value *self, struct ip *iptr, i
     void **void_pp;
   } u_ht = {&ht};
   struct ip6_hdr *ip6tr = (struct ip6_hdr *)iptr;
-
-  mrb_networkanalyzer_data *data;
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*self);
 
   memset(&ap, '\0', sizeof(ap));
 
@@ -254,8 +255,8 @@ static void handle_ip_packet(mrb_state *mrb, mrb_value *self, struct ip *iptr, i
 
   pthread_mutex_lock(&data->mutex);
   if (hash_find(data->history, &ap, u_ht.void_pp) == HASH_STATUS_KEY_NOT_FOUND) {
-    ht = history_create();
-    hash_insert(data->history, &ap, ht);
+    ht = history_create(mrb);
+    hash_insert(mrb, data->history, &ap, ht);
   }
 
   switch (IP_V(iptr)) {
@@ -341,7 +342,9 @@ static void handle_eth_packet(unsigned char *args, const struct pcap_pkthdr *pkt
   packet_loop_conf *c;
   c = (packet_loop_conf *)args;
 
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*c->self);
+  data = c->data;
+  data->counter++;
+
   eptr = (struct ether_header *)packet;
   ether_type = ntohs(eptr->ether_type);
   payload = packet + sizeof(struct ether_header);
@@ -367,22 +370,20 @@ static void handle_eth_packet(unsigned char *args, const struct pcap_pkthdr *pkt
     }
 
     iptr = (struct ip *)(payload);
-    handle_ip_packet(c->mrb, c->self, iptr, dir);
+    handle_ip_packet(c->mrb, c->data, iptr, dir);
   }
+  data->counter--;
 }
 
-void packet_init(mrb_state *mrb, mrb_value *self, char *if_name)
+void packet_init(mrb_state *mrb, mrb_networkanalyzer_data *data, char *if_name)
 {
   char errbuf[PCAP_ERRBUF_SIZE];
   int result;
-  mrb_networkanalyzer_data *data;
-
-  result = get_addrs_ioctl(mrb, self, if_name);
+  result = get_addrs_ioctl(mrb, data, if_name);
   if (result < 0) {
     mrb_raise(mrb, E_RUNTIME_ERROR, "get_addrs_ioctl error");
   }
 
-  data = (mrb_networkanalyzer_data *)DATA_PTR(*self);
   data->have_hw_addr = result & 0x01;
   data->have_ip_addr = result & 0x02;
   data->have_ip6_addr = result & 0x04;
@@ -440,48 +441,40 @@ static mrb_value mrb_networkanalyzer_new(mrb_state *mrb, mrb_value self)
   mrb_networkanalyzer_data *data;
   char *if_name;
   int if_name_len;
-  struct sigaction sa = {};
-  sa.sa_handler = finish;
-  sigaction(SIGINT, &sa, NULL);
+  char ebuf[PCAP_ERRBUF_SIZE];
 
   mrb_get_args(mrb, "s", &if_name, &if_name_len);
 
   data = (mrb_networkanalyzer_data *)mrb_malloc(mrb, sizeof(mrb_networkanalyzer_data));
   DATA_PTR(self) = data;
   DATA_TYPE(self) = &mrb_networkanalyzer_data_type;
-
-  init_history(data);
+  init_history(mrb, data);
   packet_init(mrb, &self, if_name);
   pthread_mutex_init(&data->mutex, NULL);
 
+  if ((data->pd = pcap_open_live(if_name, CAPTURE_LENGTH, 1, 1000, ebuf)) == NULL) {
+    mrb_raisef(mrb, E_RUNTIME_ERROR, "pcap open error %S", mrb_str_new_cstr(mrb, ebuf));
+  }
+
   return self;
 }
+
 static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
 {
   mrb_networkanalyzer_data *data;
-  char *if_name;
-  int if_name_len;
   int dlt;
-  pcap_t *pd;
-  char ebuf[PCAP_ERRBUF_SIZE];
+  int retry=0;
 
-  mrb_get_args(mrb, "s", &if_name, &if_name_len);
   data = (mrb_networkanalyzer_data *)DATA_PTR(self);
 
-  if ((pd = pcap_open_live(if_name, CAPTURE_LENGTH, 1, 1000, ebuf)) == NULL) {
-    mrb_raise(mrb, E_RUNTIME_ERROR, "pcap open error");
-  }
-
-  if (pd == NULL) {
-    mrb_raise(mrb, E_RUNTIME_ERROR, "pcap open error");
-  }
-
-  dlt = pcap_datalink(pd);
+  dlt = pcap_datalink(data->pd);
   if (dlt == DLT_EN10MB) {
-    packet_loop_conf c = {mrb, &self};
-
-    if (pcap_loop(pd, -1, handle_eth_packet, &c) < 0) {
-      mrb_raise(mrb, E_RUNTIME_ERROR, "pcap loop error");
+    packet_loop_conf c = {mrb, data};
+    pcap_loop(data->pd, -1, handle_eth_packet, &c);
+    pcap_close(data->pd);
+    while(data->counter != 0 && retry < WAIT_TIME) {
+      sleep(1);
+      retry++;
     }
   } else {
     mrb_raise(mrb, E_RUNTIME_ERROR, "unsupported datalink type");
@@ -489,13 +482,22 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
   return self;
 }
 
+struct RClass *networkanalyzer;
+static mrb_value mrb_networkanalyzer_stop(mrb_state *mrb, mrb_value self)
+{
+  mrb_networkanalyzer_data *data;
+  data = (mrb_networkanalyzer_data *)DATA_PTR(self);
+
+  if (mrb_obj_is_kind_of(mrb, self, networkanalyzer) && data->pd != NULL) pcap_breakloop(data->pd);
+}
+
 void mrb_mruby_network_analyzer_gem_init(mrb_state *mrb)
 {
-  struct RClass *networkanalyzer;
   networkanalyzer = mrb_define_class(mrb, "NetworkAnalyzer", mrb->object_class);
   mrb_define_method(mrb, networkanalyzer, "_new", mrb_networkanalyzer_new, MRB_ARGS_REQ(1));
-  mrb_define_method(mrb, networkanalyzer, "_collect", mrb_networkanalyzer_collect, MRB_ARGS_REQ(1));
+  mrb_define_method(mrb, networkanalyzer, "_collect", mrb_networkanalyzer_collect, MRB_ARGS_NONE());
   mrb_define_method(mrb, networkanalyzer, "current", mrb_networkanalyzer_current, MRB_ARGS_NONE());
+  mrb_define_method(mrb, networkanalyzer, "stop", mrb_networkanalyzer_stop, MRB_ARGS_NONE());
   MRB_SET_INSTANCE_TT(networkanalyzer, MRB_TT_DATA);
   DONE;
 }

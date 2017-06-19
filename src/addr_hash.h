@@ -7,6 +7,7 @@
 #ifndef __ADDR_HASH_H_ /* include guard */
 #define __ADDR_HASH_H_
 
+#include "mruby.h"
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
@@ -29,6 +30,6 @@ typedef struct {
 
 typedef addr_pair key_type;      /* index into hash table */
 
-hash_type* addr_hash_create(void);
+hash_type* addr_hash_create(mrb_state *mrb);
 
 #endif /* __ADDR_HASH_H_ */

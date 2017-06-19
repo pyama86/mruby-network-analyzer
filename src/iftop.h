@@ -4,6 +4,7 @@
  *
  */
 
+#include "mruby.h"
 #ifndef __IFTOP_H_ /* include guard */
 #define __IFTOP_H_
 
@@ -20,9 +21,6 @@ typedef struct {
     int last_write;
 } history_type;
 
-void *xmalloc(size_t n);
-void *xcalloc(size_t n, size_t m);
-void *xrealloc(void *w, size_t n);
-char *xstrdup(const char *s);
-void xfree(void *v);
+void *xmalloc(mrb_state *mrb, size_t n);
+void *xcalloc(mrb_state *mrb, size_t n, size_t m);
 #endif /* __IFTOP_H_ */

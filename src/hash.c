@@ -6,7 +6,7 @@
 #include "hash.h"
 #include "iftop.h"
 
-hash_status_enum hash_insert(hash_type* hash_table, void* key, void* rec) {
+hash_status_enum hash_insert(mrb_state *mrb, hash_type* hash_table, void* key, void* rec) {
     hash_node_type *p, *p0;
     int bucket;
 
@@ -17,11 +17,11 @@ hash_status_enum hash_insert(hash_type* hash_table, void* key, void* rec) {
 
     /* insert node at beginning of list */
     bucket = hash_table->hash(key);
-    p = xmalloc(sizeof *p);
+    p = xmalloc(mrb, sizeof *p);
     p0 = hash_table->table[bucket];
     hash_table->table[bucket] = p;
     p->next = p0;
-    p->key = hash_table->copy_key(key);
+    p->key = hash_table->copy_key(mrb, key);
     p->rec = rec;
     return HASH_STATUS_OK;
 }
@@ -120,8 +120,8 @@ void hash_delete_all(hash_type* hash_table) {
 /*
  * Allocate and return a hash
  */
-hash_status_enum hash_initialise(hash_type* hash_table) {
-    hash_table->table = xcalloc(hash_table->size, sizeof *hash_table->table);
+hash_status_enum hash_initialise(mrb_state *mrb, hash_type* hash_table) {
+    hash_table->table = xcalloc(mrb, hash_table->size, sizeof *hash_table->table);
     return HASH_STATUS_OK;
 }
 

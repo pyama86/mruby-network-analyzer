@@ -1,11 +1,19 @@
 MRUBY_CONFIG=File.expand_path(ENV["MRUBY_CONFIG"] || ".travis_build_config.rb")
-MRUBY_VERSION=ENV["MRUBY_VERSION"] || "master"
+MRUBY_VERSION=ENV["MRUBY_VERSION"] || "b979226871ab4a0f9977720d2a1fbf278d446cd3"
 
 file :mruby do
   cmd =  "git clone --depth=1 git://github.com/mruby/mruby.git"
-  if MRUBY_VERSION != 'master'
+  case MRUBY_VERSION
+  when /\A[a-fA-F0-9]+\z/
+    cmd << " && cd mruby"
+    cmd << " && git fetch --depth=100 && git checkout #{MRUBY_VERSION}"
+  when /\A\d\.\d\.\d\z/
     cmd << " && cd mruby"
     cmd << " && git fetch --tags && git checkout $(git rev-parse #{MRUBY_VERSION})"
+  when "master"
+    # skip
+  else
+    fail "Invalid MRUBY_VERSION spec: #{MRUBY_VERSION}"
   end
   sh cmd
 end

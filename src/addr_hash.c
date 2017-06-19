@@ -72,9 +72,9 @@ int hash(void* key) {
     return hash;
 }
 
-void* copy_key(void* orig) {
+void* copy_key(mrb_state *mrb, void* orig) {
     addr_pair* copy;
-    copy = xmalloc(sizeof *copy);
+    copy = xmalloc(mrb, sizeof *copy);
     *copy = *(addr_pair*)orig;
     return copy;
 }
@@ -86,18 +86,18 @@ void delete_key(void* key) {
 /*
  * Allocate and return a hash
  */
-hash_type* addr_hash_create() {
+hash_type* addr_hash_create(mrb_state *mrb) {
     hash_type* hash_table;
     //XXX: hash_table is a hash_type*, it's store a hash_node_type**
 	// initialise the hash_table like beside will waster 255 hash_type memory 
 	// hash_table = xcalloc(hash_table_size, sizeof *hash_table);
-    hash_table = xcalloc(1, sizeof *hash_table);
+    hash_table = xcalloc(mrb, 1, sizeof *hash_table);
     hash_table->size = hash_table_size;
     hash_table->compare = &compare;
     hash_table->hash = &hash;
     hash_table->delete_key = &delete_key;
     hash_table->copy_key = &copy_key;
-    hash_initialise(hash_table);
+    hash_initialise(mrb, hash_table);
     return hash_table;
 }
 
