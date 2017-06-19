@@ -385,8 +385,8 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
   char *if_name;
   int if_name_len;
   char ebuf[PCAP_ERRBUF_SIZE];
-  mrb_value sec, max;
-  max = mrb_fixnum_value(-1);
+  mrb_int sec, max;
+  max = -1;
 
   mrb_get_args(mrb, "zi|i", &if_name, &sec, &max);
 
@@ -400,9 +400,9 @@ static mrb_value mrb_networkanalyzer_collect(mrb_state *mrb, mrb_value self)
 
   dlt = pcap_datalink(data->pd);
   if (dlt == DLT_EN10MB) {
-    sleep(mrb_fixnum(sec));
+    sleep(sec);
     packet_loop_conf c = {mrb, data};
-    pcap_dispatch(data->pd, mrb_fixnum(max), handle_eth_packet, &c);
+    pcap_dispatch(data->pd, max, handle_eth_packet, &c);
     pcap_close(data->pd);
   } else {
     mrb_raise(mrb, E_RUNTIME_ERROR, "unsupported datalink type");
