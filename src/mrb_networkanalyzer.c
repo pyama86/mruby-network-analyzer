@@ -253,7 +253,6 @@ static void handle_ip_packet(mrb_state *mrb, mrb_networkanalyzer_data *data, str
     }
   }
 
-  pthread_mutex_lock(&data->mutex);
   if (hash_find(data->history, &ap, u_ht.void_pp) == HASH_STATUS_KEY_NOT_FOUND) {
     ht = history_create(mrb);
     hash_insert(mrb, data->history, &ap, ht);
@@ -287,7 +286,6 @@ static void handle_ip_packet(mrb_state *mrb, mrb_networkanalyzer_data *data, str
     data->history_totals.total_sent += len;
   }
 
-  pthread_mutex_unlock(&data->mutex);
 }
 
 void history_rotate(mrb_state *mrb, mrb_networkanalyzer_data *data)
@@ -402,7 +400,6 @@ static mrb_value mrb_networkanalyzer_current(mrb_state *mrb, mrb_value self)
   hash_node_type *n = NULL;
 
   data = (mrb_networkanalyzer_data *)DATA_PTR(self);
-  pthread_mutex_lock(&data->mutex);
 
   current = mrb_ary_new(mrb);
   while (hash_next_item(data->history, &n) == HASH_STATUS_OK) {
@@ -432,7 +429,6 @@ static mrb_value mrb_networkanalyzer_current(mrb_state *mrb, mrb_value self)
     mrb_hash_set(mrb, h, mrb_str_new_cstr(mrb, "recv_history"), ary_recv_history);
     mrb_ary_push(mrb, current, h);
   }
-  pthread_mutex_unlock(&data->mutex);
   return current;
 }
 
