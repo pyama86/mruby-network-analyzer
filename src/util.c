@@ -25,7 +25,7 @@ static const char rcsid[] = "$Id: util.c,v 1.1 2002/03/24 17:27:12 chris Exp $";
 void *xmalloc(mrb_state *mrb, size_t n) {
     void *v;
     v = mrb_malloc(mrb, n);
-    if (!v) abort();
+    if (!v) mrb_raise(mrb, E_RUNTIME_ERROR, "memory allocate error(xmalloc)");
     return v;
 }
 
@@ -34,6 +34,6 @@ void *xmalloc(mrb_state *mrb, size_t n) {
 void *xcalloc(mrb_state *mrb, size_t n, size_t m) {
     void *v;
     v = mrb_calloc(mrb, n, m);
-    if (!v) abort();
+    if (!v) mrb_raise(mrb, E_RUNTIME_ERROR, "memory allocate error(xcalloc)");
     return v;
 }
