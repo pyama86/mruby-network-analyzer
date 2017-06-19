@@ -31,13 +31,9 @@ typedef struct {
     int size;
 } hash_type;
 
-
 hash_status_enum hash_initialise(mrb_state *mrb, hash_type*);
-hash_status_enum hash_destroy(mrb_state *mrb, hash_type*);
 hash_status_enum hash_insert(mrb_state *mrb, hash_type*, void* key, void *rec);
-hash_status_enum hash_delete(mrb_state *mrb, hash_type* hash_table, void* key);
 hash_status_enum hash_find(hash_type* hash_table, void* key, void** rec);
 hash_status_enum hash_next_item(hash_type* hash_table, hash_node_type** ppnode);
-void hash_delete_all(mrb_state *mrb, hash_type* hash_table);
 
 #endif /* __HASH_H_ */
